@@ -1,26 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <style>body { margin: 0; background: #050505; overflow: hidden; }</style>
+    <meta charset="UTF-8">
+    <title>Sintez Space</title>
+    <style>
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Inter', -apple-system, sans-serif; }
+        
+        /* Шапка */
+        #header {
+            position: absolute;
+            top: 30px;
+            left: 40px;
+            color: #ffffff;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            font-size: 14px;
+            font-weight: 300;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #canvas-container { width: 100vw; height: 100vh; cursor: grab; }
+        #canvas-container:active { cursor: grabbing; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 </head>
 <body>
+
+    <div id="header">sintez.space</div>
+    <div id="canvas-container"></div>
+
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        controls.enableDamping = true;
         
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const light = new THREE.DirectionalLight(0xffffff, 1.5);
+        light.position.set(10, 10, 10);
+        scene.add(light);
+
+        let korpus = null;
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
-        let korpus = null;
 
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
@@ -30,7 +60,6 @@
         loader.load('scan2.glb', (gltf) => {
             const model = gltf.scene;
             
-            // Находим корпус и красим всё
             model.traverse(obj => {
                 if(obj.isMesh) {
                     if(obj.name.toLowerCase().includes('korpus')) {
@@ -42,10 +71,9 @@
                 }
             });
 
-            // ЦЕНТРУЕМ ВСЮ МОДЕЛЬ СРАЗУ
+            // Правильная центровка
             const box = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
-            model.position.sub(center); 
+            model.position.sub(box.getCenter(new THREE.Vector3()));
             
             scene.add(model);
             camera.position.set(0, 0, 50);
@@ -56,15 +84,18 @@
             mouse.x = (e.clientX/window.innerWidth)*2-1;
             mouse.y = -(e.clientY/window.innerHeight)*2+1;
             raycaster.setFromCamera(mouse, camera);
-            
             if(korpus) {
                 const intersects = raycaster.intersectObject(korpus);
                 korpus.material.wireframe = (intersects.length > 0);
-                korpus.material.opacity = (intersects.length > 0) ? 0.3 : 1.0;
+                korpus.material.opacity = (intersects.length > 0) ? 0.2 : 1.0;
             }
         });
 
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        function animate() { 
+            requestAnimationFrame(animate); 
+            controls.update(); 
+            renderer.render(scene, camera); 
+        }
         animate();
     </script>
 </body>

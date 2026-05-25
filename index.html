@@ -16,7 +16,6 @@
             width: 100vw;
             height: 100vh;
         }
-        /* Окно статуса загрузки и ошибок по центру */
         #status-overlay {
             position: absolute;
             top: 50%;
@@ -106,13 +105,12 @@
 
             const loader = new THREE.GLTFLoader();
             
-            updateStatus("Начало загрузки файла 'model.glb'...");
+            // Подключаем точное имя файла с двойным расширением
+            updateStatus("Начало загрузки файла 'korpus.glb.glb'...");
 
-            // Загрузка с отслеживанием прогресса и ошибок
             loader.load(
-                'model.glb', 
+                'korpus.glb.glb', 
                 function (gltf) {
-                    // Успешно загружено! Прячем окно статуса
                     document.getElementById('status-overlay').style.display = 'none';
                     
                     model = gltf.scene;
@@ -139,24 +137,22 @@
                     
                     scene.add(model);
 
+                    // Метки для этажей (высоту можно скорректировать под окна)
                     createFloorMarker(new THREE.Vector3(0, -3.0, 3), "1 Этаж", "https://example.com/floor1");
                     createFloorMarker(new THREE.Vector3(0, -0.8, 3), "2 Этаж", "https://example.com/floor2");
                     createFloorMarker(new THREE.Vector3(0, 1.4, 3), "3 Этаж", "https://example.com/floor3");
                     createFloorMarker(new THREE.Vector3(0, 3.5, 3), "4 Этаж", "https://example.com/floor4");
                 },
-                // Функция отслеживания прогресса (покажет проценты)
                 function (xhr) {
                     if (xhr.total > 0) {
                         const percentComplete = Math.round((xhr.loaded / xhr.total) * 100);
                         updateStatus("Загрузка модели: " + percentComplete + "%");
                     } else {
-                        // Если сервер не отдает общий размер, просто пишем сколько скачалось в мегабайтах
                         updateStatus("Скачивание модели... " + (xhr.loaded / (1024 * 1024)).toFixed(2) + " MB");
                     }
                 },
-                // Функция отладки критических ошибок
                 function (error) {
-                    updateStatus("ОШИБКА: Ошибка парсинга 3D-файла. Возможно, файл поврежден, слишком много весит или экспортирован не в glTF/glb.\nТехнический текст: " + error.message, true);
+                    updateStatus("ОШИБКА: Не удалось прочитать 'korpus.glb.glb'.\nТехнический текст: " + error.message, true);
                     console.error(error);
                 }
             );

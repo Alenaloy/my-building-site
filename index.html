@@ -1,14 +1,79 @@
-loader.load('scan2.glb', (gltf) => {
-    console.log("Модель загружена!");
-    
-    // СОБИРАЕМ ВСЁ В КУЧУ
-    gltf.scene.traverse(obj => {
-        if(obj.isMesh) {
-            obj.material = new THREE.MeshNormalMaterial();
-            // Сбрасываем позицию каждого куска в 0
-            obj.position.set(0, 0, 0); 
-        }
-    });
-    
-    scene.add(gltf.scene);
-}, undefined, (err) => console.error("Ошибка:", err));
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Sintez Space</title>
+    <style>
+        body { margin: 0; background-color: #050505; overflow: hidden; }
+        #canvas-container { width: 100vw; height: 100vh; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        
+        // Свет для белого цвета
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 10, 5);
+        scene.add(light);
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let building = null;
+        let scans = [];
+
+        const loader = new THREE.GLTFLoader();
+        const draco = new THREE.DRACOLoader();
+        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
+        loader.setDRACOLoader(draco);
+        
+        loader.load('scan2.glb', (gltf) => {
+            gltf.scene.traverse(obj => {
+                if(obj.isMesh) {
+                    obj.position.set(0, 0, 0); // Собираем всё в центр
+                    
+                    if(obj.name.toLowerCase().includes('korpus')) {
+                        building = obj;
+                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff});
+                    } else {
+                        scans.push(obj);
+                        obj.material = new THREE.MeshStandardMaterial({color: 0x00ffcc});
+                    }
+                }
+            });
+            scene.add(gltf.scene);
+            camera.position.set(20, 20, 20);
+        });
+
+        // Интерактив при наведении
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX/window.innerWidth)*2-1;
+            mouse.y = -(e.clientY/window.innerHeight)*2+1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObjects([building]);
+            if(building) {
+                building.material.wireframe = (intersects.length > 0);
+                building.material.opacity = (intersects.length > 0) ? 0.3 : 1.0;
+                building.material.transparent = (intersects.length > 0);
+            }
+        });
+
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        animate();
+    </script>
+</body>
+</html>

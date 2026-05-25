@@ -16,7 +16,23 @@
             width: 100vw;
             height: 100vh;
         }
-        /* Всплывающие подсказки при наведении на точки */
+        /* Окно статуса загрузки и ошибок по центру */
+        #status-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00ffcc;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px 30px;
+            border-radius: 8px;
+            font-family: monospace;
+            z-index: 100;
+            text-align: center;
+            border: 1px solid #00ffcc;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
         .label {
             position: absolute;
             color: white;
@@ -29,7 +45,6 @@
             transform: translate(-50%, -120%);
             z-index: 10;
             border: 1px solid #00ffcc;
-            box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -38,6 +53,7 @@
 </head>
 <body>
 
+    <div id="status-overlay">Инициализация 3D сцены...</div>
     <div id="canvas-container"></div>
     <div id="info-label" class="label">Этаж</div>
 
@@ -48,32 +64,35 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
+        function updateStatus(msg, isError = false) {
+            const status = document.getElementById('status-overlay');
+            if (!status) return;
+            status.style.color = isError ? '#ff3333' : '#00ffcc';
+            status.style.borderColor = isError ? '#ff3333' : '#00ffcc';
+            status.innerText = msg;
+        }
+
         init();
         animate();
 
         function init() {
             const container = document.getElementById('canvas-container');
 
-            // 1. Сцена и черный фон
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
 
-            // 2. Камера (настроена под широкий и длинный корпус)
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 8, 30); 
 
-            // 3. Рендерер
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
 
-            // 4. Управление камерой (вращение мышкой)
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
 
-            // 5. Освещение со всех сторон для объема модели
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambientLight);
 
@@ -85,51 +104,68 @@
             dirLight2.position.set(-15, 15, -20);
             scene.add(dirLight2);
 
-            // 6. Загрузка 3D модели
             const loader = new THREE.GLTFLoader();
             
-            loader.load('model.glb', function (gltf) {
-                model = gltf.scene;
-                
-                // Стильный матовый материал, подчеркивающий рельеф
-                const defaultMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x999999,
-                    roughness: 0.6,
-                    metalness: 0.1,
-                    side: THREE.DoubleSide
-                });
+            updateStatus("Начало загрузки файла 'model.glb'...");
 
-                model.traverse(function (child) {
-                    if (child.isMesh) {
-                        child.material = defaultMaterial;
+            // Загрузка с отслеживанием прогресса и ошибок
+            loader.load(
+                'model.glb', 
+                function (gltf) {
+                    // Успешно загружено! Прячем окно статуса
+                    document.getElementById('status-overlay').style.display = 'none';
+                    
+                    model = gltf.scene;
+                    
+                    const defaultMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x999999,
+                        roughness: 0.6,
+                        metalness: 0.1,
+                        side: THREE.DoubleSide
+                    });
+
+                    model.traverse(function (child) {
+                        if (child.isMesh) {
+                            child.material = defaultMaterial;
+                        }
+                    });
+                    
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    
+                    model.position.x += (model.position.x - center.x);
+                    model.position.y += (model.position.y - center.y);
+                    model.position.z += (model.position.z - center.z);
+                    
+                    scene.add(model);
+
+                    createFloorMarker(new THREE.Vector3(0, -3.0, 3), "1 Этаж", "https://example.com/floor1");
+                    createFloorMarker(new THREE.Vector3(0, -0.8, 3), "2 Этаж", "https://example.com/floor2");
+                    createFloorMarker(new THREE.Vector3(0, 1.4, 3), "3 Этаж", "https://example.com/floor3");
+                    createFloorMarker(new THREE.Vector3(0, 3.5, 3), "4 Этаж", "https://example.com/floor4");
+                },
+                // Функция отслеживания прогресса (покажет проценты)
+                function (xhr) {
+                    if (xhr.total > 0) {
+                        const percentComplete = Math.round((xhr.loaded / xhr.total) * 100);
+                        updateStatus("Загрузка модели: " + percentComplete + "%");
+                    } else {
+                        // Если сервер не отдает общий размер, просто пишем сколько скачалось в мегабайтах
+                        updateStatus("Скачивание модели... " + (xhr.loaded / (1024 * 1024)).toFixed(2) + " MB");
                     }
-                });
-                
-                // Автоматически центрируем модель корпуса по осям
-                const box = new THREE.Box3().setFromObject(model);
-                const center = box.getCenter(new THREE.Vector3());
-                
-                model.position.x += (model.position.x - center.x);
-                model.position.y += (model.position.y - center.y);
-                model.position.z += (model.position.z - center.z);
-                
-                scene.add(model);
-
-                // Расставляем маркеры по этажам твоего здания
-                // НАСТРОЙКА КООРДИНАТ: Меняй второе число (высоту Y), чтобы точки встали ровно на окна
-                createFloorMarker(new THREE.Vector3(0, -3.0, 3), "1 Этаж", "https://example.com/floor1");
-                createFloorMarker(new THREE.Vector3(0, -0.8, 3), "2 Этаж", "https://example.com/floor2");
-                createFloorMarker(new THREE.Vector3(0, 1.4, 3), "3 Этаж", "https://example.com/floor3");
-                createFloorMarker(new THREE.Vector3(0, 3.5, 3), "4 Этаж", "https://example.com/floor4");
-
-            });
+                },
+                // Функция отладки критических ошибок
+                function (error) {
+                    updateStatus("ОШИБКА: Ошибка парсинга 3D-файла. Возможно, файл поврежден, слишком много весит или экспортирован не в glTF/glb.\nТехнический текст: " + error.message, true);
+                    console.error(error);
+                }
+            );
 
             window.addEventListener('resize', onWindowResize);
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onMouseClick);
         }
 
-        // Функция для создания светящихся бирюзовых сфер на этажах
         function createFloorMarker(position, name, url) {
             const geometry = new THREE.SphereGeometry(0.35, 16, 16); 
             const material = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.9 });
@@ -154,7 +190,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Эффект наведения (Сетка Wireframe при наведении на корпус)
         function onMouseMove(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -170,7 +205,6 @@
                 });
             }
 
-            // Наведение на маркеры этажей
             const intersectsMarkers = raycaster.intersectObjects(clickableObjects);
             const label = document.getElementById('info-label');
 
@@ -192,7 +226,6 @@
             }
         }
 
-        // Логика клика для перехода по ссылкам
         function onMouseClick() {
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(clickableObjects);

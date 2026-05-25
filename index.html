@@ -16,25 +16,52 @@
         document.body.appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        scene.add(new THREE.AmbientLight(0xffffff, 2));
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
         
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let korpus = null;
+
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
         loader.setDRACOLoader(draco);
         
         loader.load('scan2.glb', (gltf) => {
-            // ВАЖНО: Мы не добавляем gltf.scene целиком, 
-            // мы перебираем каждый объект и ставим его в 0,0,0
-            gltf.scene.traverse(obj => {
+            const model = gltf.scene;
+            
+            // Находим корпус и красим всё
+            model.traverse(obj => {
                 if(obj.isMesh) {
-                    obj.position.set(0, 0, 0); // Склеиваем всё в одну точку
-                    obj.material = new THREE.MeshStandardMaterial({color: 0xffffff});
-                    scene.add(obj); 
+                    if(obj.name.toLowerCase().includes('korpus')) {
+                        korpus = obj;
+                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff, transparent: true});
+                    } else {
+                        obj.material = new THREE.MeshStandardMaterial({color: 0x00ffcc});
+                    }
                 }
             });
-            camera.position.set(15, 15, 15);
+
+            // ЦЕНТРУЕМ ВСЮ МОДЕЛЬ СРАЗУ
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.sub(center); 
+            
+            scene.add(model);
+            camera.position.set(0, 0, 50);
             controls.update();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX/window.innerWidth)*2-1;
+            mouse.y = -(e.clientY/window.innerHeight)*2+1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            if(korpus) {
+                const intersects = raycaster.intersectObject(korpus);
+                korpus.material.wireframe = (intersects.length > 0);
+                korpus.material.opacity = (intersects.length > 0) ? 0.3 : 1.0;
+            }
         });
 
         function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }

@@ -4,13 +4,8 @@
     <meta charset="UTF-8">
     <title>Sintez Space</title>
     <style>
-        body { margin: 0; background-color: #050505; overflow: hidden; font-family: sans-serif; color: white; user-select: none; }
+        body { margin: 0; background: #000; overflow: hidden; }
         #canvas-container { width: 100vw; height: 100vh; }
-        #header-logo { position: absolute; top: 24px; left: 24px; font-size: 16px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.8); z-index: 10; text-transform: lowercase; }
-        .label { position: absolute; color: #00ffcc; background: rgba(0,0,0,0.9); padding: 8px; border-radius: 4px; pointer-events: none; display: none; z-index: 100; border: 1px solid #00ffcc; }
-        #detail-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(5,5,5,0.98); display: none; z-index: 200; }
-        #modal-canvas { width: 100%; height: 100%; }
-        #close-btn { position: absolute; top: 24px; right: 24px; background: none; border: 1px solid #ff3333; color: #ff3333; padding: 8px 18px; cursor: pointer; border-radius: 4px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -18,104 +13,35 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 </head>
 <body>
-    <div id="header-logo">sintez.space</div>
-    <div id="info-label" class="label"></div>
     <div id="canvas-container"></div>
-    <div id="detail-modal">
-        <button id="close-btn" onclick="closeModal()">ЗАКРЫТЬ</button>
-        <div id="modal-canvas"></div>
-    </div>
-
     <script>
-        let scene, camera, renderer, controls, mainModel;
-        let buildingMeshes = [], scanObjects = [];
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050505);
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 10000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-            const light = new THREE.DirectionalLight(0xffffff, 1.0);
-            light.position.set(100, 100, 100);
-            scene.add(light);
-
-            const loader = new THREE.GLTFLoader();
-            const dracoLoader = new THREE.DRACOLoader();
-            dracoLoader.setDecoderPath('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/libs/draco/');
-            loader.setDRACOLoader(dracoLoader);
-            
-            loader.load('scan2.glb', (gltf) => {
-                mainModel = gltf.scene;
-                scene.add(mainModel);
-
-                mainModel.traverse((child) => {
-                    if (child.isMesh) {
-                        let mat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
-                        if (child.name.toLowerCase().includes('korpus')) {
-                            mat.color.setHex(0x666666);
-                            child.material = mat;
-                            buildingMeshes.push(child);
-                        } else {
-                            mat.color.setHex(0x00ffcc);
-                            child.material = mat;
-                            scanObjects.push(child);
-                            child.userData.originalColor = 0x00ffcc;
-                        }
-                    }
-                });
-
-                requestAnimationFrame(() => {
-                    const box = new THREE.Box3().setFromObject(mainModel);
-                    const size = new THREE.Vector3(); box.getSize(size);
-                    const center = new THREE.Vector3(); box.getCenter(center);
-                    mainModel.position.sub(center);
-                    
-                    const maxDim = Math.max(size.x, size.y, size.z) || 10;
-                    const dist = maxDim * 2.5;
-                    camera.position.set(dist, dist, dist);
-                    controls.target.set(0,0,0);
-                    controls.update();
-                });
-            });
-
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('click', () => {
-                raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(scanObjects);
-                if (intersects.length > 0) openModal(intersects[0].object);
-            });
-        }
-
-        function onMouseMove(e) {
-            mouse.x = (e.clientX/window.innerWidth)*2-1;
-            mouse.y = -(e.clientY/window.innerHeight)*2+1;
-            raycaster.setFromCamera(mouse, camera);
-            
-            const intersects = raycaster.intersectObjects(scanObjects);
-            const label = document.getElementById('info-label');
-            if(intersects.length > 0) {
-                label.style.display = 'block';
-                label.style.left = e.clientX + 'px';
-                label.style.top = e.clientY + 'px';
-                label.innerHTML = "Объект (Клик)";
-            } else label.style.display = 'none';
-        }
-
-        function openModal(mesh) {
-            document.getElementById('detail-modal').style.display = 'block';
-            // Логика модального окна остается прежней...
-        }
-        function closeModal() { document.getElementById('detail-modal').style.display = 'none'; }
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
         
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 2)); // Свет на максимум
+        
+        const loader = new THREE.GLTFLoader();
+        const draco = new THREE.DRACOLoader();
+        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
+        loader.setDRACOLoader(draco);
+        
+        loader.load('scan2.glb', (gltf) => {
+            const model = gltf.scene;
+            // ПРИНУДИТЕЛЬНО СБРАСЫВАЕМ ВСЕ СДВИГИ В НОЛЬ
+            model.position.set(0, 0, 0);
+            scene.add(model);
+            
+            camera.position.set(20, 20, 20);
+            controls.update();
+            console.log("Модель добавлена в центр (0,0,0)");
+        }, undefined, (err) => console.error(err));
+
         function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
-        init(); animate();
+        animate();
     </script>
 </body>
 </html>

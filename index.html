@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sintez Space</title>
+    <title>sintez.space</title>
     <style>
-        body, html { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: sans-serif; }
+        body { margin: 0; background: #050505; overflow: hidden; }
         #header { position: absolute; top: 30px; left: 40px; color: #fff; letter-spacing: 0.2em; text-transform: uppercase; font-size: 14px; z-index: 10; pointer-events: none; }
         #canvas-container { width: 100vw; height: 100vh; }
     </style>
@@ -14,28 +14,25 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 </head>
 <body>
-
     <div id="header">sintez.space</div>
     <div id="canvas-container"></div>
-
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.outputEncoding = THREE.sRGBEncoding; // Сохраняет оригинальные цвета из Blender
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
         
-        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(10, 10, 10);
         scene.add(light);
 
         let korpus = null;
+        let internalObjects = [];
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -45,24 +42,21 @@
         loader.setDRACOLoader(draco);
         
         loader.load('scan2.glb', (gltf) => {
-            const model = gltf.scene;
-            
-            model.traverse(obj => {
+            gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // Оставляем оригинальные материалы из Blender
                     if(obj.name.toLowerCase().includes('korpus')) {
                         korpus = obj;
-                        obj.material.transparent = true;
+                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff});
+                    } else {
+                        internalObjects.push(obj);
+                        obj.visible = false; // Скрываем в начале
                     }
                 }
             });
-
-            const box = new THREE.Box3().setFromObject(model);
-            model.position.sub(box.getCenter(new THREE.Vector3()));
-            scene.add(model);
-            
+            const box = new THREE.Box3().setFromObject(gltf.scene);
+            gltf.scene.position.sub(box.getCenter(new THREE.Vector3()));
+            scene.add(gltf.scene);
             camera.position.set(0, 0, 50);
-            controls.update();
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -72,14 +66,20 @@
             
             if(korpus) {
                 const intersects = raycaster.intersectObject(korpus);
-                korpus.material.wireframe = (intersects.length > 0);
-                korpus.material.opacity = (intersects.length > 0) ? 0.2 : 1.0;
+                const isHovered = intersects.length > 0;
+                
+                // Корпус становится полупрозрачным при наведении
+                korpus.material.transparent = isHovered;
+                korpus.material.opacity = isHovered ? 0.3 : 1.0;
+                
+                // Внутренние объекты становятся видны
+                internalObjects.forEach(obj => obj.visible = isHovered);
             }
         });
 
         function animate() { 
             requestAnimationFrame(animate); 
-            controls.update(); 
+            controls.update(); // ВРАЩЕНИЕ ТЕПЕРЬ РАБОТАЕТ
             renderer.render(scene, camera); 
         }
         animate();

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Корпус</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        /* Стили для подсказок при наведении на точки (опционально) */
+        .label {
+            position: absolute;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            transform: translate(-50%, -100%);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="info-label" class="label">Этаж</div>
+
+    <script>
+        // Основные переменные
+        let scene, camera, renderer, controls;
+        let model;
+        let clickableObjects = []; // Массив для интерактивных точек/объектов на этажах
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        init();
+        animate();
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. Сцена и черный фон
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            // 2. Камера
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 15);
+
+            // 3. Рендерер
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // 4. Управление камерой (орбитальное вращение)
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // 5. Освещение (чтобы модель было видно)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 20, 10);
+            scene.add(dirLight);
+
+            // 6. Загрузка 3D модели корпуса
+            const loader = new THREE.GLTFLoader();
+            // Укажи правильный путь к файлу модели (например, 'model.glb')
+            loader.load('model.glb', function (gltf) {
+                model = gltf.scene;
+                
+                // Центрируем модель
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.x += (model.position.x - center.x);
+                model.position.z += (model.position.z - center.z);
+                
+                scene.add(model);
+
+                // Создаем интерактивные точки для этажей (например, кубики или сферы)
+                // Координаты Y нужно подогнать под высоту этажей твоей модели
+                createFloorMarker(new THREE.Vector3(0, 0.5, 0), "1 Этаж", "https://example.com/floor1");
+                createFloorMarker(new THREE.Vector3(0, 2.0, 0), "2 Этаж", "https://example.com/floor2");
+                createFloorMarker(new THREE.Vector3(0, 3.5, 0), "3 Этаж", "https://example.com/floor3");
+
+            }, undefined, function (error) {
+                console.error('Ошибка загрузки модели:', error);
+            });
+
+            // Слушатели событий
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onMouseClick);
+        }
+
+        // Функция создания кликабельного маркера для этажа
+        function createFloorMarker(position, name, url) {
+            // Создаем небольшую светящуюся сферу-маркер
+            const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.8 });
+            const marker = new THREE.Mesh(geometry, material);
+            
+            marker.position.copy(position);
+            marker.userData = { name: name, url: url }; // Сохраняем данные внутри объекта
+            
+            scene.add(marker);
+            clickableObjects.push(marker); // Добавляем в массив для отслеживания кликов
+        }
+
+        // Анимация (обновление сцены)
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Логика наведения мыши (Wireframe для корпуса и подсветка точек)
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            if (model) {
+                // Проверяем пересечение с основным корпусом
+                const intersectsModel = raycaster.intersectObject(model, true);
+                
+                // Перебираем все внутренние меши модели и включаем/выключаем wireframe
+                model.traverse(function (child) {
+                    if (child.isMesh) {
+                        if (intersectsModel.length > 0) {
+                            child.material.wireframe = true; // Включаем сетку при наведении
+                        } else {
+                            child.material.wireframe = false; // Возвращаем обычный вид
+                        }
+                    }
+                });
+            }
+
+            // Проверяем пересечение с маркерами этажей
+            const intersectsMarkers = raycaster.intersectObjects(clickableObjects);
+            const label = document.getElementById('info-label');
+
+            if (intersectsMarkers.length > 0) {
+                const hitMarker = intersectsMarkers[0].object;
+                document.body.style.cursor = 'pointer';
+                
+                // Показываем подсказку с названием этажа
+                label.style.display = 'block';
+                label.style.left = event.clientX + 'px';
+                label.style.top = event.clientY + 'px';
+                label.innerHTML = hitMarker.userData.name;
+            } else {
+                document.body.style.cursor = 'default';
+                label.style.display = 'none';
+            }
+        }
+
+        // Логика клика по этажам
+        function onMouseClick() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableObjects);
+
+            if (intersects.length > 0) {
+                const clickedMarker = intersects[0].object;
+                // Перенаправляем пользователя на страницу этажа
+                window.location.href = clickedMarker.userData.url;
+            }
+        }
+    </script>
+</body>
+</html>

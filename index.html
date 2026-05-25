@@ -21,19 +21,15 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
         
+        // Управление (кручение)
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         
-        // Свет для белого цвета
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        // Освещение
+        scene.add(new THREE.AmbientLight(0xffffff, 1));
         const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 5);
+        light.position.set(5, 5, 5);
         scene.add(light);
-
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        let building = null;
-        let scans = [];
 
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
@@ -43,36 +39,25 @@
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    obj.position.set(0, 0, 0); // Собираем всё в центр
-                    
-                    if(obj.name.toLowerCase().includes('korpus')) {
-                        building = obj;
-                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff});
-                    } else {
-                        scans.push(obj);
-                        obj.material = new THREE.MeshStandardMaterial({color: 0x00ffcc});
-                    }
+                    // ПРИНУДИТЕЛЬНО БЕЛЫЙ МАТЕРИАЛ ДЛЯ ВСЕХ
+                    obj.material = new THREE.MeshStandardMaterial({
+                        color: 0xffffff,
+                        roughness: 0.5,
+                        metalness: 0.1
+                    });
+                    obj.position.set(0, 0, 0); // Центруем каждый объект
                 }
             });
             scene.add(gltf.scene);
             camera.position.set(20, 20, 20);
+            controls.update();
         });
 
-        // Интерактив при наведении
-        window.addEventListener('mousemove', (e) => {
-            mouse.x = (e.clientX/window.innerWidth)*2-1;
-            mouse.y = -(e.clientY/window.innerHeight)*2+1;
-            raycaster.setFromCamera(mouse, camera);
-            
-            const intersects = raycaster.intersectObjects([building]);
-            if(building) {
-                building.material.wireframe = (intersects.length > 0);
-                building.material.opacity = (intersects.length > 0) ? 0.3 : 1.0;
-                building.material.transparent = (intersects.length > 0);
-            }
-        });
-
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        function animate() { 
+            requestAnimationFrame(animate); 
+            controls.update(); // ЭТО ВКЛЮЧАЕТ КРУЧЕНИЕ
+            renderer.render(scene, camera); 
+        }
         animate();
     </script>
 </body>

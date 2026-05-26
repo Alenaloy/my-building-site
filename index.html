@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>sintez.space</title>
+    <title>Sintez Space</title>
     <style>
-        body { margin: 0; background: #050505; overflow: hidden; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: -apple-system, sans-serif; }
         #header { position: absolute; top: 30px; left: 40px; color: #fff; letter-spacing: 0.2em; text-transform: uppercase; font-size: 14px; z-index: 10; pointer-events: none; }
         #canvas-container { width: 100vw; height: 100vh; }
     </style>
@@ -14,21 +14,25 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 </head>
 <body>
+
     <div id="header">sintez.space</div>
     <div id="canvas-container"></div>
+
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // renderer.outputEncoding = THREE.sRGBEncoding; // Раскомментируйте, если нужны цвета из Blender
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
-        // Вращение на 360 градусов: OrbitControls настроены по умолчанию на свободное вращение
+        // --- ЧТОБЫ МОДЕЛЬ КРУТИЛАСЬ ---
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
+        controls.enableDamping = true; // Плавность
         controls.dampingFactor = 0.05;
-        controls.rotateSpeed = 0.8;
-
+        controls.rotateSpeed = 0.6; // Скорость вращения
+        
+        // Свет
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(10, 10, 10);
@@ -45,29 +49,38 @@
         loader.setDRACOLoader(draco);
         
         loader.load('scan2.glb', (gltf) => {
-            gltf.scene.traverse(obj => {
+            const model = gltf.scene;
+            
+            // Настройка материалов
+            model.traverse(obj => {
                 if(obj.isMesh) {
                     if(obj.name.toLowerCase().includes('korpus')) {
                         korpus = obj;
-                        // Принудительно белый цвет
-                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff});
+                        // Матово-белый, цельный
+                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.8, metalness: 0.1});
                     } else {
+                        // Внутренности: скрываем в начале
                         internalObjects.push(obj);
-                        obj.visible = false; // Скрываем внутренности в начале
+                        obj.visible = false; 
+                        // Если в Blender нет цветов, принудительно делаем их заметными:
+                        // obj.material = new THREE.MeshStandardMaterial({color: 0x00ffcc}); 
                     }
                 }
             });
-            
-            // Центрируем модель
-            const box = new THREE.Box3().setFromObject(gltf.scene);
+
+            // Автоматическая центровка
+            const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
-            gltf.scene.position.sub(center);
+            model.position.sub(center); 
             
-            scene.add(gltf.scene);
-            camera.position.set(0, 0, 50); // Отдаляем камеру, чтобы видеть модель
+            scene.add(model);
+            
+            camera.position.set(25, 15, 25);
+            camera.lookAt(new THREE.Vector3(0,0,0));
             controls.update();
         });
 
+        // Интерактив при наведении
         window.addEventListener('mousemove', (e) => {
             mouse.x = (e.clientX/window.innerWidth)*2-1;
             mouse.y = -(e.clientY/window.innerHeight)*2+1;
@@ -77,16 +90,20 @@
                 const intersects = raycaster.intersectObject(korpus);
                 const isHovered = intersects.length > 0;
                 
-                // Эффект появления внутренностей
+                // Эффект рентгена при наведении
                 korpus.material.transparent = isHovered;
-                korpus.material.opacity = isHovered ? 0.2 : 1.0;
+                korpus.material.opacity = isHovered ? 0.1 : 1.0;
+                korpus.material.wireframe = isHovered; // Включаем сетку
+                
+                // Внутренности: появляются
                 internalObjects.forEach(obj => obj.visible = isHovered);
             }
         });
 
         function animate() { 
             requestAnimationFrame(animate); 
-            controls.update(); // Обязательно для вращения
+            // controls.update() ОБЯЗАТЕЛЬНО должен быть здесь для вращения
+            controls.update(); 
             renderer.render(scene, camera); 
         }
         animate();

@@ -2,51 +2,12 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sintez Space</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400&display=swap');
-
-        body, html { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Inter', sans-serif; }
-        
-        /* СТИЛЬНАЯ МИНИМАЛИСТИЧНАЯ ШАПКА */
-        #header { 
-            position: absolute; 
-            top: 40px; 
-            left: 40px; 
-            color: rgba(255, 255, 255, 0.7); 
-            letter-spacing: 0.35em; 
-            text-transform: uppercase; 
-            font-size: 12px; 
-            font-weight: 200; 
-            z-index: 10; 
-            pointer-events: none;
-            border-left: 1px solid rgba(255, 255, 255, 0.2);
-            padding-left: 15px;
-        }
-
-        #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
-    </style>
-    ```
-
-### Что изменилось в визуале:
-1.  **Шрифт `Inter`**: Мы подключаем профессиональный шрифт через Google Fonts. Он выглядит гораздо чище и дороже стандартного.
-2.  **`letter-spacing: 0.35em`**: Это дает тот самый «дизайнерский» эффект широкого разряжения букв, который используют в люксовых или технологичных интерфейсах.
-3.  **Линия-разделитель**: Добавлена тонкая вертикальная линия (`border-left`), которая придает надписи «архитектурный» вид.
-4.  **Цвет `rgba(255, 255, 255, 0.7)`**: Слегка приглушенный белый цвет выглядит мягче и профессиональнее, чем ярко-белый `FFFFFF`.
-
-### Полный код (вставь его целиком, чтобы все изменения применились):
-
-```html
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
     <title>sintez.space</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200&display=swap');
         body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
-        #header { position: absolute; top: 40px; left: 40px; color: rgba(255, 255, 255, 0.7); letter-spacing: 0.35em; text-transform: uppercase; font-size: 12px; font-weight: 200; z-index: 10; pointer-events: none; border-left: 1px solid rgba(255, 255, 255, 0.2); padding-left: 15px; }
-        #canvas-container { width: 100vw; height: 100vh; }
+        #header { position: absolute; top: 40px; left: 40px; color: rgba(255, 255, 255, 0.7); letter-spacing: 0.35em; text-transform: uppercase; font-size: 12px; z-index: 10; pointer-events: none; border-left: 1px solid rgba(255, 255, 255, 0.2); padding-left: 15px; }
+        #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -64,10 +25,9 @@
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.minDistance = 2;
-        controls.maxDistance = 200;
-
+        controls.enableDamping = true; // Плавность вращения
+        controls.dampingFactor = 0.03; 
+        
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
         let korpus = null;
@@ -85,38 +45,50 @@
                 if(obj.isMesh) {
                     if(obj.name.toLowerCase().includes('korpus')) {
                         korpus = obj;
-                        obj.material = new THREE.MeshStandardMaterial({color: 0xffffff, transparent: true});
+                        obj.material = new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: false, transparent: true});
                     } else {
                         internalObjects.push(obj);
                         obj.visible = false;
-                        if(obj.material) {
-                            obj.material.color.setHex(0xaaaaaa);
-                            obj.material.opacity = 0.7;
-                            obj.material.transparent = true;
-                        }
                     }
                 }
             });
-            const box = new THREE.Box3().setFromObject(gltf.scene);
-            gltf.scene.position.sub(box.getCenter(new THREE.Vector3()));
             scene.add(gltf.scene);
             camera.position.set(0, 0, 50);
+        });
+
+        // Плавное следование за курсором при приближении
+        window.addEventListener('wheel', (e) => {
+            if (e.deltaY < 0) { // Если крутим на приближение
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(korpus);
+                if (intersects.length > 0) {
+                    // Плавно сдвигаем таргет камеры в точку под курсором
+                    controls.target.lerp(intersects[0].point, 0.1);
+                }
+            }
         });
 
         window.addEventListener('mousemove', (e) => {
             mouse.x = (e.clientX/window.innerWidth)*2-1;
             mouse.y = -(e.clientY/window.innerHeight)*2+1;
             raycaster.setFromCamera(mouse, camera);
+            
             if(korpus) {
                 const intersects = raycaster.intersectObject(korpus);
                 const isHovered = intersects.length > 0;
+                
+                // Оставляем только чистую сетку при наведении
                 korpus.material.wireframe = isHovered;
-                korpus.material.opacity = isHovered ? 0.15 : 1.0;
+                korpus.material.opacity = isHovered ? 0.3 : 1.0;
                 internalObjects.forEach(obj => obj.visible = isHovered);
             }
         });
 
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        function animate() { 
+            requestAnimationFrame(animate); 
+            controls.update(); 
+            renderer.render(scene, camera); 
+        }
         animate();
     </script>
 </body>

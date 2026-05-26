@@ -6,7 +6,7 @@
     <style>
         body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
         
-        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; cursor: none; }
+        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; }
         .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; transition: transform 0.2s ease-out; }
         
         #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
@@ -23,10 +23,9 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 
     <script>
-        // --- ПРЕЛОУДЕР ИНТЕРАКТИВ ---
+        // Прелоудер с интерактивом
         const loaderDiv = document.getElementById('loader');
-        const title = "SINTEZ.SPACE";
-        title.split('').forEach(char => {
+        "SINTEZ.SPACE".split('').forEach(char => {
             const span = document.createElement('span');
             span.textContent = char;
             span.className = 'letter';
@@ -42,7 +41,6 @@
             });
         });
 
-        // --- 3D СЦЕНА ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -52,6 +50,9 @@
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         
+        // Добавляем свет, чтобы цветные модели были видны
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
@@ -60,13 +61,17 @@
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // СЕТКА ТЕПЕРЬ СЕРАЯ
-                    obj.material = new THREE.MeshBasicMaterial({
-                        color: 0x444444, 
-                        wireframe: true, 
-                        transparent: true, 
-                        opacity: 0.6
-                    });
+                    // ЕСЛИ ЭТО КОРПУС - делаем его красивой серой сеткой
+                    if(obj.name.toLowerCase().includes('korpus')) {
+                        obj.material = new THREE.MeshBasicMaterial({
+                            color: 0x888888, // Стильный серебристо-серый
+                            wireframe: true, 
+                            transparent: true, 
+                            opacity: 0.3
+                        });
+                    } 
+                    // ЕСЛИ ЭТО ВНУТРЕННОСТИ - оставляем их родные материалы (цвета)
+                    // Ничего не делаем, Three.js сам подхватит оригинальные цвета из файла
                 }
             });
             scene.add(gltf.scene);

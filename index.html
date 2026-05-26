@@ -23,9 +23,12 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
+        // Вращение на 360 градусов: OrbitControls настроены по умолчанию на свободное вращение
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.8;
+
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(10, 10, 10);
@@ -46,17 +49,23 @@
                 if(obj.isMesh) {
                     if(obj.name.toLowerCase().includes('korpus')) {
                         korpus = obj;
+                        // Принудительно белый цвет
                         obj.material = new THREE.MeshStandardMaterial({color: 0xffffff});
                     } else {
                         internalObjects.push(obj);
-                        obj.visible = false; // Скрываем в начале
+                        obj.visible = false; // Скрываем внутренности в начале
                     }
                 }
             });
+            
+            // Центрируем модель
             const box = new THREE.Box3().setFromObject(gltf.scene);
-            gltf.scene.position.sub(box.getCenter(new THREE.Vector3()));
+            const center = box.getCenter(new THREE.Vector3());
+            gltf.scene.position.sub(center);
+            
             scene.add(gltf.scene);
-            camera.position.set(0, 0, 50);
+            camera.position.set(0, 0, 50); // Отдаляем камеру, чтобы видеть модель
+            controls.update();
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -68,18 +77,16 @@
                 const intersects = raycaster.intersectObject(korpus);
                 const isHovered = intersects.length > 0;
                 
-                // Корпус становится полупрозрачным при наведении
+                // Эффект появления внутренностей
                 korpus.material.transparent = isHovered;
-                korpus.material.opacity = isHovered ? 0.3 : 1.0;
-                
-                // Внутренние объекты становятся видны
+                korpus.material.opacity = isHovered ? 0.2 : 1.0;
                 internalObjects.forEach(obj => obj.visible = isHovered);
             }
         });
 
         function animate() { 
             requestAnimationFrame(animate); 
-            controls.update(); // ВРАЩЕНИЕ ТЕПЕРЬ РАБОТАЕТ
+            controls.update(); // Обязательно для вращения
             renderer.render(scene, camera); 
         }
         animate();

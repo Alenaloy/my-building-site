@@ -6,7 +6,7 @@
     <style>
         body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
         
-        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; }
+        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; cursor: none; }
         .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; transition: transform 0.2s ease-out; }
         
         #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 
     <script>
-        // Прелоудер с интерактивом
+        // Прелоудер
         const loaderDiv = document.getElementById('loader');
         "SINTEZ.SPACE".split('').forEach(char => {
             const span = document.createElement('span');
@@ -37,7 +37,7 @@
                 const rect = letter.getBoundingClientRect();
                 const dx = e.clientX - (rect.left + rect.width / 2);
                 const dy = e.clientY - (rect.top + rect.height / 2);
-                letter.style.transform = `translate(${dx/8}px, ${dy/8}px)`;
+                letter.style.transform = `translate(${dx/10}px, ${dy/10}px)`;
             });
         });
 
@@ -50,7 +50,7 @@
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         
-        // Добавляем свет, чтобы цветные модели были видны
+        // Освещение для цветных внутренностей
         scene.add(new THREE.AmbientLight(0xffffff, 1.5));
         
         const loader = new THREE.GLTFLoader();
@@ -61,17 +61,16 @@
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // ЕСЛИ ЭТО КОРПУС - делаем его красивой серой сеткой
+                    // ЕСЛИ КОРПУС - делаем его тонкой серой сеткой
                     if(obj.name.toLowerCase().includes('korpus')) {
                         obj.material = new THREE.MeshBasicMaterial({
-                            color: 0x888888, // Стильный серебристо-серый
+                            color: 0x555555, // Благородный серый
                             wireframe: true, 
                             transparent: true, 
-                            opacity: 0.3
+                            opacity: 0.25      // Едва заметная сетка
                         });
-                    } 
-                    // ЕСЛИ ЭТО ВНУТРЕННОСТИ - оставляем их родные материалы (цвета)
-                    // Ничего не делаем, Three.js сам подхватит оригинальные цвета из файла
+                    }
+                    // Если НЕ корпус, оставляем оригинальный материал (цветной)
                 }
             });
             scene.add(gltf.scene);

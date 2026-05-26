@@ -5,15 +5,12 @@
     <title>Sintez.Space</title>
     <style>
         body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
-        
         #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; cursor: none; }
         .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; transition: transform 0.2s ease-out; }
-        
         #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
     </style>
 </head>
 <body>
-
     <div id="loader"></div>
     <div id="canvas-container"></div>
 
@@ -23,7 +20,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 
     <script>
-        // Прелоудер
         const loaderDiv = document.getElementById('loader');
         "SINTEZ.SPACE".split('').forEach(char => {
             const span = document.createElement('span');
@@ -33,11 +29,9 @@
         });
 
         window.addEventListener('mousemove', (e) => {
-            document.querySelectorAll('.letter').forEach((letter) => {
-                const rect = letter.getBoundingClientRect();
-                const dx = e.clientX - (rect.left + rect.width / 2);
-                const dy = e.clientY - (rect.top + rect.height / 2);
-                letter.style.transform = `translate(${dx/10}px, ${dy/10}px)`;
+            document.querySelectorAll('.letter').forEach((l) => {
+                const rect = l.getBoundingClientRect();
+                l.style.transform = `translate(${(e.clientX - (rect.left + rect.width/2))/10}px, ${(e.clientY - (rect.top + rect.height/2))/10}px)`;
             });
         });
 
@@ -48,10 +42,7 @@
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        
-        // Освещение для цветных внутренностей
-        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
         
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
@@ -60,22 +51,12 @@
         
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
-                if(obj.isMesh) {
-                    // ЕСЛИ КОРПУС - делаем его тонкой серой сеткой
-                    if(obj.name.toLowerCase().includes('korpus')) {
-                        obj.material = new THREE.MeshBasicMaterial({
-                            color: 0x555555, // Благородный серый
-                            wireframe: true, 
-                            transparent: true, 
-                            opacity: 0.25      // Едва заметная сетка
-                        });
-                    }
-                    // Если НЕ корпус, оставляем оригинальный материал (цветной)
+                if(obj.isMesh && obj.name.toLowerCase().includes('korpus')) {
+                    obj.material = new THREE.MeshBasicMaterial({color: 0x555555, wireframe: true, transparent: true, opacity: 0.2});
                 }
             });
             scene.add(gltf.scene);
             camera.position.set(0, 0, 50);
-            
             loaderDiv.style.opacity = '0';
             setTimeout(() => loaderDiv.style.display = 'none', 1500);
         });

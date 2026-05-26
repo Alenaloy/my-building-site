@@ -6,7 +6,6 @@
     <style>
         body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
         
-        /* Прелоудер */
         #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; cursor: none; }
         .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; transition: transform 0.2s ease-out; }
         
@@ -61,12 +60,12 @@
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // Возвращаем стандартный режим сетки без заливки цветом
+                    // СЕТКА ТЕПЕРЬ СЕРАЯ
                     obj.material = new THREE.MeshBasicMaterial({
-                        color: 0xffffff, // Обычный белый/серый цвет сетки
+                        color: 0x444444, 
                         wireframe: true, 
                         transparent: true, 
-                        opacity: 0.5
+                        opacity: 0.6
                     });
                 }
             });

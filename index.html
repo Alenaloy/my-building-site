@@ -24,68 +24,39 @@
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-        
-        // Начальная позиция камеры
-        camera.position.set(0, 50, 200);
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
+        camera.position.set(0, 50, 150);
 
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
         loader.setDRACOLoader(draco);
         
-        let building;
-        let isFlying = true;
-
         loader.load('scan2.glb', (gltf) => {
-            building = gltf.scene;
-            
-            building.traverse(obj => {
+            gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // Создаем сетку-обертку поверх сжатой модели
+                    obj.material.color.set(0x222222);
                     const wireframe = new THREE.Mesh(
                         obj.geometry,
                         new THREE.MeshBasicMaterial({
-                            color: 0x888888,
+                            color: 0xffffff,
                             wireframe: true,
                             transparent: true,
-                            opacity: 0.2
+                            opacity: 0.3
                         })
                     );
                     obj.add(wireframe);
-                    
-                    // Приглушаем яркость оригинальной модели
-                    if(obj.material) {
-                        obj.material.color.set(0x333333);
-                    }
                 }
             });
-            scene.add(building);
-        });
+            scene.add(gltf.scene);
+        }, undefined, (err) => { console.error("Ошибка загрузки:", err); });
 
-        // Анимация полета камеры
-        let t = 0;
         function animate() {
             requestAnimationFrame(animate);
-            
-            if (isFlying && t < 1) {
-                t += 0.005; // Скорость полета
-                camera.position.z = 200 - (t * 150);
-                camera.position.y = 50 - (t * 40);
-                if (t >= 1) isFlying = false;
-            }
-
             controls.update();
             renderer.render(scene, camera);
         }
         animate();
-
-        // Адаптивность
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>

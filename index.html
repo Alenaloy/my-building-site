@@ -16,7 +16,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
     <script>
-        // Инициализация сцены
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 5000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -24,24 +23,19 @@
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        
-        // Освещение
-        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-        dirLight.position.set(5, 10, 5);
-        scene.add(dirLight);
-
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
         camera.position.set(0, 50, 150);
 
-        // Загрузка модели
+        // Используем базовый загрузчик без DRACO
         const loader = new THREE.GLTFLoader();
+        
+        console.log("Попытка загрузки scan2.glb...");
         loader.load('scan2.glb', (gltf) => {
+            console.log("Ура! Модель загружена.");
+            
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // Делаем оригинальную модель чуть темнее
-                    obj.material.color.set(0x444444);
-                    
-                    // Накладываем белую сетку (wireframe)
+                    // Создаем сетку
                     const wireframe = new THREE.Mesh(
                         obj.geometry,
                         new THREE.MeshBasicMaterial({
@@ -52,25 +46,21 @@
                         })
                     );
                     obj.add(wireframe);
+                    // Затемняем оригинал
+                    obj.material.color.set(0x333333);
                 }
             });
             scene.add(gltf.scene);
-        }, undefined, (err) => console.error("Ошибка загрузки:", err));
+        }, undefined, (error) => {
+            console.error("Ошибка загрузки:", error);
+        });
 
-        // Анимация
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
         }
         animate();
-
-        // Адаптив
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>

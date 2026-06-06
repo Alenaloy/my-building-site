@@ -5,8 +5,8 @@
     <title>Sintez.Space</title>
     <style>
         body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
-        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; cursor: none; }
-        .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; transition: transform 0.2s ease-out; }
+        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; }
+        .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; }
         #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
     </style>
 </head>
@@ -18,27 +18,16 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
     <script>
-        const loaderDiv = document.getElementById('loader');
-        "SINTEZ.SPACE".split('').forEach(char => {
-            const span = document.createElement('span');
-            span.textContent = char;
-            span.className = 'letter';
-            loaderDiv.appendChild(span);
-        });
-        window.addEventListener('mousemove', (e) => {
-            document.querySelectorAll('.letter').forEach((l) => {
-                const rect = l.getBoundingClientRect();
-                l.style.transform = `translate(${(e.clientX - (rect.left + rect.width/2))/10}px, ${(e.clientY - (rect.top + rect.height/2))/10}px)`;
-            });
-        });
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ReinhardToneMapping; // Мягкий свет
+        renderer.toneMappingExposure = 0.8; // Убираем пересвет
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        scene.add(new THREE.AmbientLight(0xffffff, 2));
+        controls.enableDamping = true;
         
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
@@ -47,16 +36,41 @@
         
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
-                if(obj.isMesh && obj.name.toLowerCase().includes('korpus')) {
-                    // ✅ БЫЛО: color: 0x555555, opacity: 0.2 — тёмный и почти невидимый
-                    obj.material = new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.35});
+                if(obj.isMesh) {
+                    // Если это корпус - сетка
+                    if(obj.name.toLowerCase().includes('korpus')) {
+                        obj.material = new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2});
+                    } else {
+                        // Для внутренних сканов: приглушаем яркость
+                        if(obj.material) {
+                            obj.material.emissiveIntensity = 0.2;
+                            obj.material.color.multiplyScalar(0.8); // Слегка гасим цвета
+                        }
+                        // Вариативность: немного сдвигаем каждый этаж/объект, если это допустимо
+                        if(obj.position.y > 0) obj.position.x += (Math.random() - 0.5) * 0.2;
+                    }
                 }
             });
             scene.add(gltf.scene);
             camera.position.set(0, 0, 50);
-            loaderDiv.style.opacity = '0';
-            setTimeout(() => loaderDiv.style.display = 'none', 1500);
+            document.getElementById('loader').style.opacity = '0';
         });
+
+        // Навигация к объекту при клике
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        window.addEventListener('click', (e) => {
+            mouse.x = (e.clientX/window.innerWidth)*2-1;
+            mouse.y = -(e.clientY/window.innerHeight)*2+1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if(intersects.length > 0) {
+                // Плавный полет камеры к точке клика
+                const target = intersects[0].point;
+                controls.target.copy(target);
+            }
+        });
+
         function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
         animate();
     </script>

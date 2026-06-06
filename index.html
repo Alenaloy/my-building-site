@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <title>Sintez.Space</title>
     <style>
-        body { margin: 0; background: #050505; overflow: hidden; font-family: 'Inter', sans-serif; }
-        #loader { position: fixed; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s; }
-        .letter { color: #fff; font-size: 32px; letter-spacing: 0.2em; text-transform: uppercase; display: inline-block; }
-        #canvas-container { width: 100vw; height: 100vh; cursor: crosshair; }
+        body { margin: 0; background: #050505; overflow: hidden; }
+        #canvas-container { width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
-    <div id="loader"></div>
     <div id="canvas-container"></div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -22,13 +19,14 @@
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.toneMapping = THREE.ReinhardToneMapping; // Мягкий свет
-        renderer.toneMappingExposure = 0.8; // Убираем пересвет
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        
+        camera.position.set(0, 0, 100);
+
+        let isAnimating = true;
+        let t = 0;
+
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
@@ -37,41 +35,33 @@
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // Если это корпус - сетка
                     if(obj.name.toLowerCase().includes('korpus')) {
-                        obj.material = new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2});
+                        obj.material = new THREE.MeshBasicMaterial({color: 0x444444, wireframe: true, transparent: true, opacity: 0.1});
                     } else {
-                        // Для внутренних сканов: приглушаем яркость
+                        // Уменьшаем яркость
                         if(obj.material) {
-                            obj.material.emissiveIntensity = 0.2;
-                            obj.material.color.multiplyScalar(0.8); // Слегка гасим цвета
+                            obj.material.emissive.set(0x000000);
+                            obj.material.color.multiplyScalar(0.6); 
                         }
-                        // Вариативность: немного сдвигаем каждый этаж/объект, если это допустимо
-                        if(obj.position.y > 0) obj.position.x += (Math.random() - 0.5) * 0.2;
+                        // Вариативность этажей (случайный сдвиг)
+                        if(obj.position.y > 1) obj.position.z += Math.sin(obj.position.y) * 0.5;
                     }
                 }
             });
             scene.add(gltf.scene);
-            camera.position.set(0, 0, 50);
-            document.getElementById('loader').style.opacity = '0';
         });
 
-        // Навигация к объекту при клике
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        window.addEventListener('click', (e) => {
-            mouse.x = (e.clientX/window.innerWidth)*2-1;
-            mouse.y = -(e.clientY/window.innerHeight)*2+1;
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
-            if(intersects.length > 0) {
-                // Плавный полет камеры к точке клика
-                const target = intersects[0].point;
-                controls.target.copy(target);
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isAnimating) {
+                t += 0.005;
+                camera.position.x = Math.sin(t) * 20;
+                camera.position.z = 50 - (t * 10);
+                if (t > 4) isAnimating = false; // Полет длится 4 секунды
             }
-        });
-
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+            controls.update();
+            renderer.render(scene, camera);
+        }
         animate();
     </script>
 </body>

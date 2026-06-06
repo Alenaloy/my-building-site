@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Model Walker</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; overflow:hidden; font-family:'Courier New',monospace; }
+    canvas { display:block; }
+    #ui { position:fixed; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+    #crosshair { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; opacity:0; transition:opacity 0.3s; }
+    #crosshair::before, #crosshair::after { content:''; position:absolute; background:rgba(255,255,255,0.7); border-radius:2px; }
+    #crosshair::before { width:1px; height:12px; left:50%; top:50%; transform:translate(-50%,-50%); }
+    #crosshair::after  { width:12px; height:1px; left:50%; top:50%; transform:translate(-50%,-50%); }
+    body.walking #crosshair { opacity:1; }
+    #overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; z-index:50; transition:opacity 0.5s; }
+    #overlay.hidden { opacity:0; pointer-events:none; }
+    #overlay h1 { font-size:13px; letter-spacing:0.3em; color:rgba(255,255,255,0.5); text-transform:uppercase; font-weight:400; }
+    #enter-btn { background:transparent; border:1px solid rgba(255,255,255,0.25); color:rgba(255,255,255,0.7); font-family:'Courier New',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; padding:14px 36px; border-radius:30px; cursor:pointer; transition:all 0.2s; }
+    #enter-btn:hover { background:rgba(255,255,255,0.07); border-color:rgba(255,255,255,0.5); color:#fff; }
+    .hint-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:10px; letter-spacing:0.1em; color:rgba(255,255,255,0.3); text-align:center; }
+    .hint-grid span { display:flex; align-items:center; gap:6px; justify-content:center; }
+    .key { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:4px; padding:2px 7px; font-size:10px; color:rgba(255,255,255,0.5); }
+    #speed-ui { position:fixed; bottom:28px; right:28px; font-size:9px; letter-spacing:0.15em; color:rgba(255,255,255,0.2); text-transform:uppercase; line-height:2; opacity:0; transition:opacity 0.3s; }
+    body.walking #speed-ui { opacity:1; }
+    #speed-bar-wrap { width:80px; height:1px; background:rgba(255,255,255,0.08); margin-top:4px; }
+    #speed-bar { height:100%; background:rgba(255,255,255,0.4); width:30%; transition:width 0.1s; }
+    #esc-hint { position:fixed; top:20px; right:24px; font-size:9px; letter-spacing:0.15em; color:rgba(255,255,255,0.18); text-transform:uppercase; opacity:0; transition:opacity 0.3s; }
+    body.walking #esc-hint { opacity:1; }
+    #loading { position:fixed; inset:0; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:100; transition:opacity 0.6s; }
+    #loading.hidden { opacity:0; pointer-events:none; }
+    #loading-pct { font-size:36px; color:rgba(255,255,255,0.6); letter-spacing:0.05em; font-weight:300; }
+    #loading-bar-wrap { width:180px; height:1px; background:rgba(255,255,255,0.08); }
+    #loading-bar { height:100%; background:rgba(255,255,255,0.5); width:0%; transition:width 0.3s; }
+    #loading-label { font-size:9px; letter-spacing:0.2em; color:rgba(255,255,255,0.25); text-transform:uppercase; }
+    #error { position:fixed; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; color:rgba(255,255,255,0.4); font-size:12px; letter-spacing:0.1em; text-align:center; padding:40px; }
+    #error.show { display:flex; }
+    #error strong { color:rgba(255,80,60,0.8); font-size:10px; letter-spacing:0.2em; text-transform:uppercase; }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-pct">0%</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  <div id="loading-label">Loading model</div>
+</div>
+
+<div id="error">
+  <strong>Model not found</strong>
+  <p>Put <code>scan3.glb</code> next to this <code>index.html</code></p>
+</div>
+
+<div id="overlay">
+  <h1>Walk through model</h1>
+  <button id="enter-btn">Click to enter</button>
+  <div class="hint-grid">
+    <span><span class="key">W A S D</span> Move</span>
+    <span><span class="key">Mouse</span> Look</span>
+    <span><span class="key">Shift</span> Run</span>
+    <span><span class="key">↑ ↓</span> Speed</span>
+    <span><span class="key">Space</span> Up</span>
+    <span><span class="key">Ctrl</span> Down</span>
+    <span><span class="key">ESC</span> Exit</span>
+    <span><span class="key">R</span> Reset</span>
+  </div>
+</div>
+
+<div id="crosshair"></div>
+<div id="speed-ui">Speed<div id="speed-bar-wrap"><div id="speed-bar"></div></div></div>
+<div id="esc-hint">ESC exit</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.FogExp2(0x000000, 0.0008);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.001, 5000);
+camera.position.set(0, 1.7, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const key = new THREE.DirectionalLight(0xfff5e0, 2.0);
+key.position.set(10, 20, 10);
+key.castShadow = true;
+scene.add(key);
+scene.add(Object.assign(new THREE.DirectionalLight(0xc8d8ff, 0.7), { position: new THREE.Vector3(-8,4,-5) }));
+scene.add(new THREE.HemisphereLight(0x223355, 0x000000, 0.5));
+
+const controls = new PointerLockControls(camera, renderer.domElement);
+scene.add(controls.getObject());
+
+const keys = {};
+let baseSpeed = 0.04;
+let moveSpeed = baseSpeed;
+let startPos = new THREE.Vector3(0, 1.7, 5);
+const vel = new THREE.Vector3();
+const dir = new THREE.Vector3();
+
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'ArrowUp')   { baseSpeed = Math.min(baseSpeed * 1.3, 5); updateSpeedBar(); }
+  if (e.code === 'ArrowDown') { baseSpeed = Math.max(baseSpeed / 1.3, 0.001); updateSpeedBar(); }
+  if (e.code === 'KeyR') { controls.getObject().position.copy(startPos); }
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+function updateSpeedBar() {
+  document.getElementById('speed-bar').style.width = Math.min(baseSpeed/0.5,1)*100+'%';
+}
+
+const overlayEl = document.getElementById('overlay');
+const loadingEl = document.getElementById('loading');
+const barEl = document.getElementById('loading-bar');
+const pctEl = document.getElementById('loading-pct');
+const errorEl = document.getElementById('error');
+
+document.getElementById('enter-btn').addEventListener('click', () => controls.lock());
+controls.addEventListener('lock', () => { overlayEl.classList.add('hidden'); document.body.classList.add('walking'); });
+controls.addEventListener('unlock', () => { overlayEl.classList.remove('hidden'); document.body.classList.remove('walking'); });
+
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/draco/');
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+
+gltfLoader.load(
+  'scan3.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    model.traverse(n => {
+      if (n.isMesh) {
+        n.castShadow = true;
+        n.receiveShadow = true;
+        if (n.material) {
+          const mats = Array.isArray(n.material) ? n.material : [n.material];
+          mats.forEach(m => { m.side = THREE.DoubleSide; });
+        }
+      }
+    });
+    scene.add(model);
+
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    model.position.sub(center);
+
+    const eyeH = size.y * 0.3;
+    const startZ = size.z * 0.65;
+    camera.position.set(0, eyeH, startZ);
+    startPos.set(0, eyeH, startZ);
+
+    baseSpeed = maxDim * 0.004;
+    updateSpeedBar();
+
+    camera.near = maxDim * 0.00003;
+    camera.far = maxDim * 200;
+    camera.updateProjectionMatrix();
+
+    loadingEl.classList.add('hidden');
+  },
+  (e) => {
+    barEl.style.width = (e.loaded/(e.total||1)*100)+'%';
+    pctEl.textContent = Math.round(e.loaded/(e.total||1)*100)+'%';
+  },
+  () => { loadingEl.classList.add('hidden'); errorEl.classList.add('show'); }
+);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (controls.isLocked) {
+    moveSpeed = baseSpeed * ((keys['ShiftLeft']||keys['ShiftRight']) ? 3.5 : 1);
+    dir.set(0,0,0);
+    if (keys['KeyW']) dir.z -= 1;
+    if (keys['KeyS']) dir.z += 1;
+    if (keys['KeyA']) dir.x -= 1;
+    if (keys['KeyD']) dir.x += 1;
+    if (keys['Space']) dir.y += 1;
+    if (keys['ControlLeft']||keys['ControlRight']) dir.y -= 1;
+    dir.normalize();
+    if (dir.z !== 0) controls.moveForward(-dir.z * moveSpeed);
+    if (dir.x !== 0) controls.moveRight(dir.x * moveSpeed);
+    if (dir.y !== 0) controls.getObject().position.y += dir.y * moveSpeed;
+  }
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

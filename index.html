@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Sintez.Space</title>
     <style>
-        body { margin: 0; background: #050505; overflow: hidden; }
+        body { margin: 0; background: #000; overflow: hidden; }
         #canvas-container { width: 100vw; height: 100vh; }
     </style>
 </head>
@@ -15,46 +15,43 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
     <script>
+        console.log("Скрипт запущен");
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 5000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.toneMapping = THREE.ReinhardToneMapping;
-        renderer.toneMappingExposure = 1.0;
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        camera.position.set(0, 0, 80);
+        camera.position.set(0, 0, 500);
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
 
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
         loader.setDRACOLoader(draco);
         
-        // Загрузка новой модели scan2.glb
+        console.log("Начинаю загрузку scan2.glb...");
+        
         loader.load('scan2.glb', (gltf) => {
-            gltf.scene.traverse(obj => {
-                if(obj.isMesh) {
-                    // Универсальный поиск: ищем что-то похожее на корпус или стены
-                    const name = obj.name.toLowerCase();
-                    if(name.includes('korpus') || name.includes('wall') || name.includes('building')) {
-                        obj.material = new THREE.MeshBasicMaterial({
-                            color: 0xffffff, 
-                            wireframe: true, 
-                            transparent: true, 
-                            opacity: 0.15
-                        });
-                    } else {
-                        // Для внутренних объектов: делаем их чуть спокойнее
-                        if(obj.material) {
-                            obj.material.emissiveIntensity = 0.1;
-                        }
-                    }
-                }
-            });
+            console.log("Модель успешно загружена!");
             scene.add(gltf.scene);
-        }, undefined, (error) => {
-            console.error('Ошибка загрузки модели:', error);
+            
+            // Центрируем камеру на модели
+            const box = new THREE.Box3().setFromObject(gltf.scene);
+            const size = box.getSize(new THREE.Vector3()).length();
+            const center = box.getCenter(new THREE.Vector3());
+            controls.target.copy(center);
+            camera.near = size / 100;
+            camera.far = size * 100;
+            camera.updateProjectionMatrix();
+            camera.position.set(center.x, center.y, center.z + size);
+            
+        }, (xhr) => {
+            console.log((xhr.loaded / xhr.total * 100) + '% загружено');
+        }, (error) => {
+            console.error("ОШИБКА загрузки:", error);
+            alert("Ошибка загрузки модели. Проверь консоль (F12).");
         });
 
         function animate() {

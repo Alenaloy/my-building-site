@@ -1,37 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta charset="utf-8">
-    <style>body { margin: 0; background: #000; overflow: hidden; }</style>
+    <meta charset="UTF-8">
+    <title>Sintez.Space</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        #canvas-container { width: 100vw; height: 100vh; }
+    </style>
 </head>
 <body>
+    <div id="canvas-container"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
     <script>
+        // Инициализация сцены
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 5000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        scene.add(new THREE.AmbientLight(0xffffff, 2));
-        camera.position.z = 50;
+        
+        // Освещение
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
 
+        camera.position.set(0, 50, 150);
+
+        // Загрузка модели
         const loader = new THREE.GLTFLoader();
         loader.load('scan2.glb', (gltf) => {
+            gltf.scene.traverse(obj => {
+                if(obj.isMesh) {
+                    // Делаем оригинальную модель чуть темнее
+                    obj.material.color.set(0x444444);
+                    
+                    // Накладываем белую сетку (wireframe)
+                    const wireframe = new THREE.Mesh(
+                        obj.geometry,
+                        new THREE.MeshBasicMaterial({
+                            color: 0xffffff,
+                            wireframe: true,
+                            transparent: true,
+                            opacity: 0.2
+                        })
+                    );
+                    obj.add(wireframe);
+                }
+            });
             scene.add(gltf.scene);
-            console.log("Ура! Модель добавлена в сцену");
-        }, undefined, (error) => {
-            console.error("Ошибка загрузки:", error);
-        });
+        }, undefined, (err) => console.error("Ошибка загрузки:", err));
 
+        // Анимация
         function animate() {
             requestAnimationFrame(animate);
+            controls.update();
             renderer.render(scene, camera);
         }
         animate();
+
+        // Адаптив
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>

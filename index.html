@@ -10,56 +10,40 @@
 </head>
 <body>
     <div id="canvas-container"></div>
-
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 5000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        document.body.appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         scene.add(new THREE.AmbientLight(0xffffff, 2));
         camera.position.set(0, 50, 150);
 
-        // Используем базовый загрузчик без DRACO
         const loader = new THREE.GLTFLoader();
-        
-        console.log("Попытка загрузки scan2.glb...");
-        loader.load('scan2.glb', (gltf) => {
-            console.log("Ура! Модель загружена.");
-            
+        // Используем прямую ссылку на твой файл
+        const modelUrl = 'https://dropmefiles.com/get/bYkQe/scan2.glb';
+
+        loader.load(modelUrl, (gltf) => {
+            console.log("Успешная загрузка!");
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    // Создаем сетку
-                    const wireframe = new THREE.Mesh(
-                        obj.geometry,
-                        new THREE.MeshBasicMaterial({
-                            color: 0xffffff,
-                            wireframe: true,
-                            transparent: true,
-                            opacity: 0.2
-                        })
-                    );
-                    obj.add(wireframe);
-                    // Затемняем оригинал
                     obj.material.color.set(0x333333);
+                    const wireframe = new THREE.Mesh(obj.geometry, new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2}));
+                    obj.add(wireframe);
                 }
             });
             scene.add(gltf.scene);
-        }, undefined, (error) => {
-            console.error("Ошибка загрузки:", error);
+        }, undefined, (err) => {
+            console.error("Ошибка загрузки:", err);
+            alert("Ошибка загрузки модели. Проверьте консоль F12.");
         });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
         animate();
     </script>
 </body>

@@ -19,46 +19,46 @@
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 1.0;
         document.getElementById('canvas-container').appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        camera.position.set(0, 0, 100);
-
-        let isAnimating = true;
-        let t = 0;
+        camera.position.set(0, 0, 80);
 
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
         loader.setDRACOLoader(draco);
         
+        // Загрузка новой модели scan2.glb
         loader.load('scan2.glb', (gltf) => {
             gltf.scene.traverse(obj => {
                 if(obj.isMesh) {
-                    if(obj.name.toLowerCase().includes('korpus')) {
-                        obj.material = new THREE.MeshBasicMaterial({color: 0x444444, wireframe: true, transparent: true, opacity: 0.1});
+                    // Универсальный поиск: ищем что-то похожее на корпус или стены
+                    const name = obj.name.toLowerCase();
+                    if(name.includes('korpus') || name.includes('wall') || name.includes('building')) {
+                        obj.material = new THREE.MeshBasicMaterial({
+                            color: 0xffffff, 
+                            wireframe: true, 
+                            transparent: true, 
+                            opacity: 0.15
+                        });
                     } else {
-                        // Уменьшаем яркость
+                        // Для внутренних объектов: делаем их чуть спокойнее
                         if(obj.material) {
-                            obj.material.emissive.set(0x000000);
-                            obj.material.color.multiplyScalar(0.6); 
+                            obj.material.emissiveIntensity = 0.1;
                         }
-                        // Вариативность этажей (случайный сдвиг)
-                        if(obj.position.y > 1) obj.position.z += Math.sin(obj.position.y) * 0.5;
                     }
                 }
             });
             scene.add(gltf.scene);
+        }, undefined, (error) => {
+            console.error('Ошибка загрузки модели:', error);
         });
 
         function animate() {
             requestAnimationFrame(animate);
-            if (isAnimating) {
-                t += 0.005;
-                camera.position.x = Math.sin(t) * 20;
-                camera.position.z = 50 - (t * 10);
-                if (t > 4) isAnimating = false; // Полет длится 4 секунды
-            }
             controls.update();
             renderer.render(scene, camera);
         }

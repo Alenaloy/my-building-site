@@ -1,9 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Тест</title>
+    <meta charset="utf-8">
+    <style>body { margin: 0; background: #000; overflow: hidden; }</style>
 </head>
-<body style="background: blue;">
-    <h1 style="color: white; text-align: center; margin-top: 20%;">Сайт работает!</h1>
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
+        camera.position.z = 50;
+
+        const loader = new THREE.GLTFLoader();
+        loader.load('scan2.glb', (gltf) => {
+            scene.add(gltf.scene);
+            console.log("Ура! Модель добавлена в сцену");
+        }, undefined, (error) => {
+            console.error("Ошибка загрузки:", error);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
 </body>
 </html>
